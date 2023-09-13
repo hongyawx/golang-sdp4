@@ -1,0 +1,47 @@
+#pragma once
+#include <iostream>
+#include "geo.hpp"
+#include "SGP4.hpp"
+#include "SDP4.hpp"
+#include "comm.hpp"
+using namespace std;
+struct AngleResult
+{
+	float pitch;
+	float yaw;
+};
+
+class comm 
+{
+public:
+	comm(){};
+	~comm(){};
+	static AngleResult calculateAngle(string line1, string line2, string line3, int year, int month, int day, int hour, int min, int sec, double lat, double lon, double altKm)
+	{
+		AngleResult result = {};
+
+		TLE tle(line1, line2, line3);
+		bool sgp_model = tle.model_init();
+		if (sgp_model)
+		{
+			cout << "初始化成功" << endl;
+		}
+		else
+		{
+			cout << "初始化失败" << endl;
+		}
+		NoradBase* norad_base = new SGP4(tle);
+		Julian ju_now(year, month, day, hour, min, sec);
+		double mpe = ju_now.SpanMin(tle.Epoch());
+		norad_base->GetPosition(mpe);
+		double radiusAe = XKMPER_WGS72 / AE;
+		norad_base->ScalePosVector(radiusAe);
+		norad_base->ScaleVelVector(radiusAe * (MIN_PER_DAY / 86400));
+		Geo geo(lat, lon, altKm);
+		geo.GetLookAngle(norad_base->Position(), norad_base->Velocity(), norad_base->Date());
+		result.pitch = geo.ElevationDeg();
+		result.yaw = geo.AzimuthDeg();
+		delete norad_base;
+		return result;
+	}
+};
